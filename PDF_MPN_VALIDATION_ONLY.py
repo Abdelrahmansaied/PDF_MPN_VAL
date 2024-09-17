@@ -147,7 +147,7 @@ def main():
 
                 result_data = PN_Validation_New(pdf_data_extracted, 'MPN', 'PDF', mpn_data)
 
-                for col in ['MPN', 'STATUS', 'EQUIVALENT', 'SIMILARS']:
+                for col in ['MPN','PDF', 'STATUS', 'EQUIVALENT', 'SIMILARS']:
                     result_data[col] = result_data[col].apply(clean_string)
 
                 st.subheader("Validation Results")
@@ -160,7 +160,7 @@ def main():
 
                 for index, row in result_data.iterrows():
                     color = STATUS_color.get(row['STATUS'], 'black')
-                    st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - {row['EQUIVALENT']} - {row['SIMILARS']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['PDF']} - {row['STATUS']} - {row['EQUIVALENT']} - {row['SIMILARS']}</div>", unsafe_allow_html=True)
 
                 output_file = "MPN_Validation_Results_Separate_Files.xlsx"
                 result_data.to_excel(output_file, index=False, engine='openpyxl')
