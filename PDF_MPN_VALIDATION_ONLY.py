@@ -5,7 +5,7 @@ import io
 import streamlit as st
 from concurrent.futures import ThreadPoolExecutor
 import difflib as dlb
-import fitz
+import fitz  # PyMuPDF
 import traceback
 
 def clean_string(s):
@@ -14,7 +14,7 @@ def clean_string(s):
         return re.sub(r'[\x00-\x1F\x7F]', '', s)
     return s
 
-def GetPDFResponse(pdf):
+def get_pdf_response(pdf):
     """Get PDF response from URL and return content."""
     try:
         response = requests.get(pdf, timeout=10)
@@ -24,32 +24,32 @@ def GetPDFResponse(pdf):
         print(f"Error fetching PDF {pdf}: {e}")
         return pdf, None
 
-def GetPDFText(pdfs):
+def get_pdf_text(pdfs):
     """Extract text from a list of PDF URLs."""
-    pdfData = {}
+    pdf_data = {}
     chunks = [pdfs[i:i + 100] for i in range(0, len(pdfs), 100)]
 
     for chunk in chunks:
         with ThreadPoolExecutor() as executor:
-            results = list(executor.map(GetPDFResponse, chunk))
+            results = list(executor.map(get_pdf_response, chunk))
 
         for pdf, byt in results:
             if byt is not None:
                 try:
                     with fitz.open(stream=byt, filetype='pdf') as doc:
-                        pdfData[pdf] = '\n'.join(page.get_text() for page in doc)
+                        pdf_data[pdf] = '\n'.join(page.get_text() for page in doc)
                 except Exception as e:
                     print(f"Error reading PDF {pdf}: {e}")
 
-    return pdfData
+    return pdf_data
 
-def PN_Validation_New(pdf_data, part_col, pdf_col, data):
+def pn_validation(pdf_data, part_col, pdf_col, data):
     """Validate parts against extracted PDF data."""
     data['STATUS'] = None
     data['EQUIVALENT'] = None
     data['SIMILARS'] = None
 
-    def SET_DESC(index):
+    def set_desc(index):
         part = data[part_col][index]
         pdf_url = data[pdf_col][index]
         if pdf_url not in pdf_data:
@@ -82,14 +82,28 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
         data['STATUS'][index] = 'Not Found'
 
     with ThreadPoolExecutor() as executor:
-        executor.map(SET_DESC, data.index)
+        executor.map(set_desc, data.index)
 
     return data
+
+def search_mpns_in_pdfs(mpns, pdf_data):
+    """Search for MPNs in provided PDFs and return matches."""
+    found_pdfs = []
+    
+    for mpn in mpns:
+        for pdf_url, content in pdf_data.items():
+            if re.search(re.escape(mpn), content, flags=re.IGNORECASE):
+                found_pdfs.append({"MPN": mpn, "PDF_URL": pdf_url})
+    
+    return found_pdfs
 
 def main():
     st.title("MPN PDF Validation App 🛠️")
 
-    uploaded_file = st.file_uploader("Upload Excel file with MPN and PDF URL", type=["xlsx"])
+    # Section for uploading a single file with MPNs and PDF URLs
+    st.subheader("Upload Excel file with MPN and PDF URL")
+    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
+    
     if uploaded_file is not None:
         try:
             data = pd.read_excel(uploaded_file)
@@ -98,8 +112,8 @@ def main():
 
             if all(col in data.columns for col in ['MPN', 'PDF']):
                 pdfs = data['PDF'].tolist()
-                pdf_data = GetPDFText(pdfs)
-                result_data = PN_Validation_New(pdf_data, 'MPN', 'PDF', data)
+                pdf_data = get_pdf_text(pdfs)
+                result_data = pn_validation(pdf_data, 'MPN', 'PDF', data)
 
                 # Clean the output data
                 for col in ['MPN', 'PDF', 'STATUS', 'EQUIVALENT', 'SIMILARS']:
@@ -124,6 +138,44 @@ def main():
 
             else:
                 st.error("The uploaded file must contain 'MPN' and 'PDF' columns.")
+        except Exception as e:
+            st.error(f"An error occurred while processing: {e}")
+            st.error(traceback.format_exc())
+
+    # Section for searching MPNs in separate PDF files
+    st.subheader("Upload Excel file with MPNs and another with PDF URLs")
+    uploaded_mpn_file = st.file_uploader("Upload Excel file with MPNs", type=["xlsx"], key='mpn')
+    uploaded_pdf_file = st.file_uploader("Upload Excel file with PDF URLs", type=["xlsx"], key='pdf')
+
+    if uploaded_mpn_file is not None and uploaded_pdf_file is not None:
+        try:
+            mpn_data = pd.read_excel(uploaded_mpn_file)
+            pdf_data_frame = pd.read_excel(uploaded_pdf_file)
+
+            st.write("### Uploaded MPN Data:")
+            st.dataframe(mpn_data)
+
+            st.write("### Uploaded PDF Data:")
+            st.dataframe(pdf_data_frame)
+
+            if 'MPN' in mpn_data.columns and 'PDF' in pdf_data_frame.columns:
+                mpns = mpn_data['MPN'].tolist()
+                pdfs = pdf_data_frame['PDF'].tolist()
+
+                # Get PDF text content
+                pdf_data = get_pdf_text(pdfs)
+
+                # Search MPNs in PDFs
+                found_pdfs = search_mpns_in_pdfs(mpns, pdf_data)
+
+                # Display results
+                if found_pdfs:
+                    st.subheader("Found PDFs:")
+                    st.write(pd.DataFrame(found_pdfs))
+                else:
+                    st.write("No PDFs found containing the provided MPNs.")
+            else:
+                st.error("Both files must contain an 'MPN' and a 'PDF' column.")
         except Exception as e:
             st.error(f"An error occurred while processing: {e}")
             st.error(traceback.format_exc())
