@@ -87,7 +87,7 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
     return data
 
 def main():
-    st.title("MPN PDF Validation App ???")
+    st.title("MPN PDF Validation App 🛠️")
 
     uploaded_file = st.file_uploader("Upload Excel file with MPN and PDF URL", type=["xlsx"])
     if uploaded_file is not None:
