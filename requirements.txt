@@ -1,0 +1,6 @@
+streamlit
+pandas
+requests
+PyMuPDF
+difflib
+openpyxl
