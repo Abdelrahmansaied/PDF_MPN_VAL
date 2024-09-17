@@ -48,7 +48,7 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
     data['STATUS'] = None
     data['EQUIVALENT'] = None
     data['SIMILARS'] = None
-    data['FOUND_PDF'] = None  # New column to store found PDF URLs
+    data['FOUND_PDF'] = None  # Store found PDF URLs
 
     def SET_DESC(index):
         part = data[part_col][index]
@@ -57,12 +57,23 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
         for pdf_url, values in pdf_data.items():
             if len(values) <= 100:
                 data['STATUS'][index] = 'OCR'
-                continue
+                found_pdf = pdf_url
+                break
 
             if re.search(re.escape(part), values, flags=re.IGNORECASE):
                 data['STATUS'][index] = 'Exact'
                 data['EQUIVALENT'][index] = part
                 found_pdf = pdf_url
+                break
+
+            # Check for similar matches
+            semi_regex = {
+                match.strip() for match in re.findall(r'\b\w*' + re.escape(part) + r'\w*\b', values, flags=re.IGNORECASE)
+            }
+            if semi_regex:
+                data['STATUS'][index] = 'Includes or Missed Suffixes'
+                data['SIMILARS'][index] = '|'.join(semi_regex)
+                found_pdf = pdf_url  # Assuming we want to keep the PDF URL for this case
                 break
 
         if found_pdf:
@@ -100,7 +111,8 @@ def main():
                     STATUS_color = {
                         'Exact': 'green',
                         'OCR': 'gray',
-                        'Not Found': 'red'
+                        'Not Found': 'red',
+                        'Includes or Missed Suffixes': 'orange'
                     }
 
                     for index, row in result_data.iterrows():
@@ -151,7 +163,8 @@ def main():
                 STATUS_color = {
                     'Exact': 'green',
                     'OCR': 'gray',
-                    'Not Found': 'red'
+                    'Not Found': 'red',
+                    'Includes or Missed Suffixes': 'orange'
                 }
 
                 for index, row in result_data.iterrows():
