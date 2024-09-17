@@ -1,12 +1,18 @@
 import re
 import pandas as pd
+import uuid
 import requests
 import io
+from sqlalchemy import create_engine, text
+import sqlalchemy
 import streamlit as st
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 import difflib as dlb
 import fitz
 import traceback
+
+warnings.filterwarnings("ignore")
 
 def clean_string(s):
     """Remove illegal characters from a string."""
@@ -48,10 +54,11 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
     data['STATUS'] = None
     data['EQUIVALENT'] = None
     data['SIMILARS'] = None
+    data['FOUND_PDF'] = None  # New column to store found PDF URLs
 
     def SET_DESC(index):
         part = data[part_col][index]
-        found = False
+        found_pdf = None
 
         for pdf_url, values in pdf_data.items():
             if len(values) <= 100:
@@ -61,16 +68,13 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
             if re.search(re.escape(part), values, flags=re.IGNORECASE):
                 data['STATUS'][index] = 'Exact'
                 data['EQUIVALENT'][index] = part
-                found = True
+                found_pdf = pdf_url
                 break
 
-        if not found:
-            dlb_match = dlb.get_close_matches(part, [pdf_url for pdf_url in pdf_data.keys()], n=1, cutoff=0.65)
-            if dlb_match:
-                data['STATUS'][index] = 'Includes or Missed Suffixes'
-                data['EQUIVALENT'][index] = dlb_match[0]
-            else:
-                data['STATUS'][index] = 'Not Found'
+        if found_pdf:
+            data['FOUND_PDF'][index] = found_pdf
+        else:
+            data['STATUS'][index] = 'Not Found'
 
     with ThreadPoolExecutor() as executor:
         executor.map(SET_DESC, data.index)
@@ -95,20 +99,19 @@ def main():
                     pdf_data = GetPDFText(pdfs)
                     result_data = PN_Validation_New(pdf_data, 'MPN', 'PDF', data)
 
-                    for col in ['MPN', 'PDF', 'STATUS', 'EQUIVALENT', 'SIMILARS']:
+                    for col in ['MPN', 'PDF', 'STATUS', 'EQUIVALENT', 'SIMILARS', 'FOUND_PDF']:
                         result_data[col] = result_data[col].apply(clean_string)
 
                     st.subheader("Validation Results")
                     STATUS_color = {
                         'Exact': 'green',
-                        'Includes or Missed Suffixes': 'orange',
-                        'Not Found': 'red',
-                        'OCR': 'gray'
+                        'OCR': 'gray',
+                        'Not Found': 'red'
                     }
 
                     for index, row in result_data.iterrows():
                         color = STATUS_color.get(row['STATUS'], 'black')
-                        st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - {row['EQUIVALENT']} - {row['SIMILARS']}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - Found PDF: {row['FOUND_PDF']}</div>", unsafe_allow_html=True)
 
                     output_file = "MPN_Validation_Result.xlsx"
                     result_data.to_excel(output_file, index=False, engine='openpyxl')
@@ -147,20 +150,19 @@ def main():
 
                 result_data = PN_Validation_New(pdf_data_extracted, 'MPN', 'PDF', mpn_data)
 
-                for col in ['MPN','PDF', 'STATUS', 'EQUIVALENT', 'SIMILARS']:
+                for col in ['MPN', 'STATUS', 'EQUIVALENT', 'SIMILARS', 'FOUND_PDF']:
                     result_data[col] = result_data[col].apply(clean_string)
 
                 st.subheader("Validation Results")
                 STATUS_color = {
                     'Exact': 'green',
-                    'Includes or Missed Suffixes': 'orange',
-                    'Not Found': 'red',
-                    'OCR': 'gray'
+                    'OCR': 'gray',
+                    'Not Found': 'red'
                 }
 
                 for index, row in result_data.iterrows():
                     color = STATUS_color.get(row['STATUS'], 'black')
-                    st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['PDF']} - {row['STATUS']} - {row['EQUIVALENT']} - {row['SIMILARS']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - Found PDF: {row['FOUND_PDF']}</div>", unsafe_allow_html=True)
 
                 output_file = "MPN_Validation_Results_Separate_Files.xlsx"
                 result_data.to_excel(output_file, index=False, engine='openpyxl')
