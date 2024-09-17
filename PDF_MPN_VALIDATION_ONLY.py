@@ -1,16 +1,12 @@
 import re
 import pandas as pd
-import uuid
 import requests
 import io
 import streamlit as st
-import warnings
 from concurrent.futures import ThreadPoolExecutor
 import difflib as dlb
 import fitz
 import traceback
-
-warnings.filterwarnings("ignore")
 
 def clean_string(s):
     """Remove illegal characters from a string."""
@@ -52,27 +48,38 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
     data['STATUS'] = None
     data['EQUIVALENT'] = None
     data['SIMILARS'] = None
-    data['FOUND_PDF'] = None  # New column to store found PDF URLs
 
     def SET_DESC(index):
         part = data[part_col][index]
-        found_pdf = None
+        pdf_url = data[pdf_col][index]
+        if pdf_url not in pdf_data:
+            data['STATUS'][index] = 'May be Broken'
+            return
 
-        for pdf_url, values in pdf_data.items():
-            if len(values) <= 100:
-                data['STATUS'][index] = 'OCR'
-                continue
+        values = pdf_data[pdf_url]
+        if len(values) <= 100:
+            data['STATUS'][index] = 'OCR'
+            return
 
-            if re.search(re.escape(part), values, flags=re.IGNORECASE):
-                data['STATUS'][index] = 'Exact'
-                data['EQUIVALENT'][index] = part
-                found_pdf = pdf_url
-                break
+        exact = re.search(re.escape(part), values, flags=re.IGNORECASE)
+        if exact:
+            data['STATUS'][index] = 'Exact'
+            data['EQUIVALENT'][index] = exact.group(0)
+            semi_regex = {
+                match.strip() for match in re.findall(r'\b\w*' + re.escape(part) + r'\w*\b', values, flags=re.IGNORECASE)
+            }
+            if semi_regex:
+                data['SIMILARS'][index] = '|'.join(semi_regex)
+            return
 
-        if found_pdf:
-            data['FOUND_PDF'][index] = found_pdf
-        else:
-            data['STATUS'][index] = 'Not Found'
+        dlb_match = dlb.get_close_matches(part, re.split('[ \n]', values), n=1, cutoff=0.65)
+        if dlb_match:
+            pdf_part = dlb_match[0]
+            data['STATUS'][index] = 'Includes or Missed Suffixes'
+            data['EQUIVALENT'][index] = pdf_part
+            return
+
+        data['STATUS'][index] = 'Not Found'
 
     with ThreadPoolExecutor() as executor:
         executor.map(SET_DESC, data.index)
