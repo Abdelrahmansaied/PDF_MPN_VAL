@@ -120,7 +120,7 @@ def main():
 
                 output_file = "MPN_Validation_Result.xlsx"
                 result_data.to_excel(output_file, index=False, engine='openpyxl')
-                st.sidebar.download_button("Download Results ??", data=open(output_file, "rb"), file_name=output_file)
+                st.sidebar.download_button("Download Results 📥", data=open(output_file, "rb"), file_name=output_file)
 
             else:
                 st.error("The uploaded file must contain 'MPN' and 'PDF' columns.")
