@@ -3,8 +3,6 @@ import pandas as pd
 import uuid
 import requests
 import io
-from sqlalchemy import create_engine, text
-import sqlalchemy
 import streamlit as st
 import warnings
 from concurrent.futures import ThreadPoolExecutor
