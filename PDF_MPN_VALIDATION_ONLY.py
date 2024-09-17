@@ -48,38 +48,27 @@ def PN_Validation_New(pdf_data, part_col, pdf_col, data):
     data['STATUS'] = None
     data['EQUIVALENT'] = None
     data['SIMILARS'] = None
+    data['FOUND_PDF'] = None  # New column to store found PDF URLs
 
     def SET_DESC(index):
         part = data[part_col][index]
-        pdf_url = data[pdf_col][index]
-        if pdf_url not in pdf_data:
-            data['STATUS'][index] = 'May be Broken'
-            return
+        found_pdf = None
 
-        values = pdf_data[pdf_url]
-        if len(values) <= 100:
-            data['STATUS'][index] = 'OCR'
-            return
+        for pdf_url, values in pdf_data.items():
+            if len(values) <= 100:
+                data['STATUS'][index] = 'OCR'
+                continue
 
-        exact = re.search(re.escape(part), values, flags=re.IGNORECASE)
-        if exact:
-            data['STATUS'][index] = 'Exact'
-            data['EQUIVALENT'][index] = exact.group(0)
-            semi_regex = {
-                match.strip() for match in re.findall(r'\b\w*' + re.escape(part) + r'\w*\b', values, flags=re.IGNORECASE)
-            }
-            if semi_regex:
-                data['SIMILARS'][index] = '|'.join(semi_regex)
-            return
+            if re.search(re.escape(part), values, flags=re.IGNORECASE):
+                data['STATUS'][index] = 'Exact'
+                data['EQUIVALENT'][index] = part
+                found_pdf = pdf_url
+                break
 
-        dlb_match = dlb.get_close_matches(part, re.split('[ \n]', values), n=1, cutoff=0.65)
-        if dlb_match:
-            pdf_part = dlb_match[0]
-            data['STATUS'][index] = 'Includes or Missed Suffixes'
-            data['EQUIVALENT'][index] = pdf_part
-            return
-
-        data['STATUS'][index] = 'Not Found'
+        if found_pdf:
+            data['FOUND_PDF'][index] = found_pdf
+        else:
+            data['STATUS'][index] = 'Not Found'
 
     with ThreadPoolExecutor() as executor:
         executor.map(SET_DESC, data.index)
@@ -116,7 +105,7 @@ def main():
 
                     for index, row in result_data.iterrows():
                         color = STATUS_color.get(row['STATUS'], 'black')
-                        st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - Found PDF: {row['FOUND_PDF']}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - Found PDF: {row['FOUND_PDF'] if row['FOUND_PDF'] else 'None'}</div>", unsafe_allow_html=True)
 
                     output_file = "MPN_Validation_Result.xlsx"
                     result_data.to_excel(output_file, index=False, engine='openpyxl')
@@ -167,7 +156,7 @@ def main():
 
                 for index, row in result_data.iterrows():
                     color = STATUS_color.get(row['STATUS'], 'black')
-                    st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - Found PDF: {row['FOUND_PDF']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - Found PDF: {row['FOUND_PDF'] if row['FOUND_PDF'] else 'None'}</div>", unsafe_allow_html=True)
 
                 output_file = "MPN_Validation_Results_Separate_Files.xlsx"
                 result_data.to_excel(output_file, index=False, engine='openpyxl')
