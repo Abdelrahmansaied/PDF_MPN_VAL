@@ -97,6 +97,39 @@ def search_mpns_in_pdfs(mpns, pdf_data):
     
     return found_pdfs
 
+def save_to_excel(data, filename):
+    """Save results to a formatted Excel file."""
+    with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
+        data.to_excel(writer, sheet_name='Results', index=False)
+
+        # Get the xlsxwriter workbook and worksheet objects
+        workbook = writer.book
+        worksheet = writer.sheets['Results']
+
+        # Format approaches
+        format1 = workbook.add_format({'bold': True, 'font_color': 'blue'})
+        format2 = workbook.add_format({'font_color': 'red'})
+        format3 = workbook.add_format({'font_color': 'green'})
+        format4 = workbook.add_format({'bg_color': '#FFC7CE'})  # light red
+
+        # Set the column width and header format
+        worksheet.set_column('A:E', 20)  # Adjust column width
+        worksheet.set_row(0, 20, format1)  # Header formatting
+
+        # Conditional formatting for the STATUS column
+        worksheet.conditional_format('C2:C1000', {'type': 'text',
+                                                    'criteria': 'containing',
+                                                    'value': 'May be Broken',
+                                                    'format': format4})
+        worksheet.conditional_format('C2:C1000', {'type': 'text',
+                                                    'criteria': 'containing',
+                                                    'value': 'Not Found',
+                                                    'format': format2})
+        worksheet.conditional_format('C2:C1000', {'type': 'text',
+                                                    'criteria': 'containing',
+                                                    'value': 'Exact',
+                                                    'format': format3})
+
 def main():
     st.title("MPN PDF Validation App 🛠️")
 
@@ -132,8 +165,9 @@ def main():
                     color = STATUS_color.get(row['STATUS'], 'black')
                     st.markdown(f"<div style='color: {color};'>{row['MPN']} - {row['STATUS']} - {row['EQUIVALENT']} - {row['SIMILARS']}</div>", unsafe_allow_html=True)
 
+                # Save results to an Excel file with formatting
                 output_file = "MPN_Validation_Result.xlsx"
-                result_data.to_excel(output_file, index=False, engine='openpyxl')
+                save_to_excel(result_data, output_file)
                 st.sidebar.download_button("Download Results 📥", data=open(output_file, "rb"), file_name=output_file)
 
             else:
@@ -171,7 +205,13 @@ def main():
                 # Display results
                 if found_pdfs:
                     st.subheader("Found PDFs:")
-                    st.write(pd.DataFrame(found_pdfs))
+                    found_df = pd.DataFrame(found_pdfs)
+                    st.write(found_df)
+
+                    # Save found results to an Excel file
+                    output_found_file = "Found_PDFs.xlsx"
+                    save_to_excel(found_df, output_found_file)
+                    st.sidebar.download_button("Download Found PDFs 📥", data=open(output_found_file, "rb"), file_name=output_found_file)
                 else:
                     st.write("No PDFs found containing the provided MPNs.")
             else:
