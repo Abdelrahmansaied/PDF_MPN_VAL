@@ -180,7 +180,24 @@ def main():
     st.subheader("Upload Excel file with MPNs and another with PDF URLs")
     uploaded_mpn_file = st.file_uploader("Upload Excel file with MPNs", type=["xlsx"], key='mpn')
     uploaded_pdf_file = st.file_uploader("Upload Excel file with PDF URLs", type=["xlsx"], key='pdf')
-
+    footer = """
+    <style>
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: #f1f1f1;
+        color: black;
+        text-align: center;
+        padding: 10px;
+    }
+    </style>
+    <div class="footer">
+        <p>© 2024 Developed by  Abdelrahman El Sharkawy . All rights reserved.</p>
+    </div>
+    """
+    st.markdown(footer, unsafe_allow_html=True)
     if uploaded_mpn_file is not None and uploaded_pdf_file is not None:
         try:
             mpn_data = pd.read_excel(uploaded_mpn_file)
