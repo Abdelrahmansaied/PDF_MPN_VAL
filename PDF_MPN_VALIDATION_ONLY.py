@@ -6,6 +6,7 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor
 import difflib as dlb
 import fitz
+import easyocr
 import traceback
 import easyocr  # Import EasyOCR
 import numpy as np
