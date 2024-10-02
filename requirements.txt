@@ -4,4 +4,3 @@ requests
 PyMuPDF
 openpyxl
 xlsxwriter
-easyocr
